@@ -9,6 +9,7 @@ Note, it's not that visible, but there is a little 3D effect, particularly on th
 Two possibilities : 
 Either you clone the repo in the right folder of your web server
 Or you download the archive in the releases, then you have to run the script in the data folder, which will download and format data from the NASA to our use. It will take a loooonnng time, and around 190MB of disk space (but you can change the timespan of the data you want in the script). Finally, you can open the index.html, or if you have a PHP enabled web server, index.php.
+You can also do a pseudo-animation by pressing 'p' for play (and for 'pause', also).
 That's all !
 
 Note : You have access to more information when hovering over the objects.

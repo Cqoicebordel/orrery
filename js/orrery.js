@@ -60,6 +60,10 @@ function getAnglePlanet(p, day){
 	}
 }
 
+function getCSVDate(date){
+	return date.getUTCFullYear() + "-" + months[date.getUTCMonth()] + "-" + ((date.getUTCDate()<10)?"0"+date.getUTCDate():date.getUTCDate()) + " " + ((date.getUTCHours()<10)?"0"+date.getUTCHours():date.getUTCHours()) + ":00:00";
+}
+
 // Calculate display coordinates from angle
 function coordinatesPlanet(numberPlanet, angle){
 	var angleRad = angle*(Math.PI / 180);
@@ -67,10 +71,10 @@ function coordinatesPlanet(numberPlanet, angle){
 }
 
 // Get the angle of a moon from the data stored in the CSVs
-function getAngleMoon(data){
+function getAngleMoon(data, date, dateCSV){
 	for(var i=0; i<data.length; i++){
 		if(data[i][0] == dateCSV){
-			return [(parseFloat(data[i][1]) + (now.getUTCMinutes() * (parseFloat(data[i+1][1]) - parseFloat(data[i][1])))/60), (parseFloat(data[i][2]) + (now.getUTCMinutes() * (parseFloat(data[i+1][2]) - parseFloat(data[i][2])))/60)];
+			return [(parseFloat(data[i][1]) + (date.getUTCMinutes() * (parseFloat(data[i+1][1]) - parseFloat(data[i][1])))/60), (parseFloat(data[i][2]) + (date.getUTCMinutes() * (parseFloat(data[i+1][2]) - parseFloat(data[i][2])))/60)];
 		}
 	}
 }
@@ -81,11 +85,38 @@ function coordinatesMoon(xPlanet, yPlanet, indexMoon, angle){
 	return [xPlanet-(marginMoon+ratioM*indexMoon)*Math.sin(angleRad), yPlanet-(marginMoon+ratioM*indexMoon)*Math.cos(angleRad)];
 }
 
-// Update the display
+// Update based on the current date
 function update(){
-	day = Astronomy.DayValue(new Date());
-	now = new Date();
-	dateCSV = now.getUTCFullYear() + "-" + months[now.getUTCMonth()] + "-" + ((now.getUTCDate()<10)?"0"+now.getUTCDate():now.getUTCDate()) + " " + ((now.getUTCHours()<10)?"0"+now.getUTCHours():now.getUTCHours()) + ":00:00";
+	var now = new Date();
+	update(now);
+}
+
+// Update based on the date in the hash
+function updateFromHash(){
+	var date = Date.parse(window.location.hash.substring(1));
+	if(!isNaN(date)){
+		update(new Date(date));
+	}
+}
+
+// Change the date to create an animation
+function letsPlay(){
+	var objDate;
+	if(window.location.hash == "" || window.location.hash === undefined){
+		objDate = new Date();
+	}
+	var date = Date.parse(window.location.hash.substring(1));
+	if(!isNaN(date)){
+		date = date + 3600000;
+		var objDate = new Date(date);
+	}
+	window.location.hash = objDate.toISOString();
+}
+
+// Update the display
+function update(now){
+	var dateCSV = getCSVDate(now);
+	var day = Astronomy.DayValue(now);
 	
 	for (var i in Astronomy.Body) {
 		planets[i][2] = getAnglePlanet(Astronomy.Body[i], day);
@@ -101,7 +132,7 @@ function update(){
 	for (let i=0; i<moons.length; i++){
 		d3.text("./data/"+moons[i][2]+"/"+now.getUTCFullYear()+"-"+((now.getUTCMonth()+1<10)?"0"+(now.getUTCMonth()+1):(now.getUTCMonth()+1))+".csv", function(text){
 			var data = d3.csvParseRows(text);
-			var moonAngle = getAngleMoon(data);
+			var moonAngle = getAngleMoon(data, now, dateCSV);
 			moons[i][5] = moonAngle[0];
 			moons[i][6] = moonAngle[1]
 			var coord = coordinatesMoon(planets[moons[i][3]][3], planets[moons[i][3]][4], moons[i][4], moons[i][5]);
@@ -116,60 +147,95 @@ function update(){
 	}
 }
 
-var now = new Date(); 
-var dateCSV = now.getUTCFullYear() + "-" + months[now.getUTCMonth()] + "-" + ((now.getUTCDate()<10)?"0"+now.getUTCDate():now.getUTCDate()) + " " + ((now.getUTCHours()<10)?"0"+now.getUTCHours():now.getUTCHours()) + ":00:00";
+// First draw
+function firstDraw(now){
+	var dateCSV = getCSVDate(now);
+	var day = Astronomy.DayValue(now);
 
-// Main display area
-var svg = d3.select("body").append("svg")
-			.attr("width", width)
-			.attr("height", height)
-			.append("g")
-			.attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+	// Main display area
+	var svg = d3.select("body").append("svg")
+				.attr("width", width)
+				.attr("height", height)
+				.append("g")
+				.attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
 
-// Display the Sun
-svg.append("circle").attr("cx", 0)
-					.attr("cy", 0)
-					.attr("r", 3*r)
-					.attr("fill", "yellow");
+	// Display the Sun
+	svg.append("circle").attr("cx", 0)
+						.attr("cy", 0)
+						.attr("r", 3*r)
+						.attr("fill", "yellow");
 
+						
+	// Display the planets
+	for (var i in Astronomy.Body) {
+		planets[i] = planets[i].concat(getAnglePlanet(Astronomy.Body[i], day));
+		planets[i] = planets[i].concat(coordinatesPlanet(i+1, planets[i][2]));
+		svg.append("circle")
+		.attr("cx", 0)
+		.attr("cy", 0)
+		.attr("r", ratio*(i+1)+margin)
+		.attr("fill", "none")
+		.attr("stroke", "grey");
+		svg.append("circle")
+		.attr("cx", planets[i][3])
+		.attr("cy", planets[i][4])
+		.attr("r", r)
+		.attr("fill", planets[i][1])
+		.attr("id", "p"+i)
+		.append("svg:title").attr("id", "titlep"+i).html(planets[i][0] + " - " + planets[i][2]);
+	}
 
-
-var day = Astronomy.DayValue(new Date());
-
-// Display the planets
-for (var i in Astronomy.Body) {
-	planets[i] = planets[i].concat(getAnglePlanet(Astronomy.Body[i], day));
-	planets[i] = planets[i].concat(coordinatesPlanet(i+1, planets[i][2]));
-	svg.append("circle")
-	   .attr("cx", 0)
-	   .attr("cy", 0)
-	   .attr("r", ratio*(i+1)+margin)
-	   .attr("fill", "none")
-	   .attr("stroke", "grey");
-	svg.append("circle")
-	   .attr("cx", planets[i][3])
-	   .attr("cy", planets[i][4])
-	   .attr("r", r)
-	   .attr("fill", planets[i][1])
-	   .attr("id", "p"+i)
-	   .append("svg:title").attr("id", "titlep"+i).html(planets[i][0] + " - " + planets[i][2]);
+	// Display the moons
+	for (let i=0; i<moons.length; i++){
+		d3.text("./data/"+moons[i][2]+"/"+now.getUTCFullYear()+"-"+((now.getUTCMonth()+1<10)?"0"+(now.getUTCMonth()+1):(now.getUTCMonth()+1))+".csv", function(text){
+			var data = d3.csvParseRows(text);
+			moons[i] = moons[i].concat(getAngleMoon(data, now, dateCSV));
+			moons[i] = moons[i].concat(coordinatesMoon(planets[moons[i][3]][3], planets[moons[i][3]][4], moons[i][4], moons[i][5]));
+			svg.append("circle")
+				.attr("cx", moons[i][7])
+				.attr("cy", moons[i][8])
+				.attr("r", rM + (moons[i][6]/40))
+				.attr("fill", moons[i][1])
+				.attr("id", "m"+i)
+				.append("svg:title").attr("id", "titlem"+i).html(moons[i][0] + " - " + moons[i][5] + "x" + moons[i][6]);
+		});
+	}
 }
 
-// Display the moons
-for (let i=0; i<moons.length; i++){
-	d3.text("./data/"+moons[i][2]+"/"+now.getUTCFullYear()+"-"+((now.getUTCMonth()+1<10)?"0"+(now.getUTCMonth()+1):(now.getUTCMonth()+1))+".csv", function(text){
-		var data = d3.csvParseRows(text);
-		moons[i] = moons[i].concat(getAngleMoon(data));
-		moons[i] = moons[i].concat(coordinatesMoon(planets[moons[i][3]][3], planets[moons[i][3]][4], moons[i][4], moons[i][5]));
-		svg.append("circle")
-			.attr("cx", moons[i][7])
-			.attr("cy", moons[i][8])
-			.attr("r", rM + (moons[i][6]/40))
-			.attr("fill", moons[i][1])
-			.attr("id", "m"+i)
-			.append("svg:title").attr("id", "titlem"+i).html(moons[i][0] + " - " + moons[i][5] + "x" + moons[i][6]);
-	});
+// In animation
+var play = false;
+// Current date
+var now;
+
+if(window.location.hash == "" || window.location.hash === undefined){
+	now = new Date();
+	firstDraw(now);
+}else{
+	var date = Date.parse(window.location.hash.substring(1));
+	if(!isNaN(date)){
+		now = new Date(date);
+	}else{
+		now = new Date();
+	}
+	firstDraw(now);
 }
 
 // Autoupdates every minutes
-window.setInterval(update, 60000);
+var updateID = window.setInterval(update, 60000);
+// If animated, this is the setInterval ID
+var playID;
+
+// Update when the hash has changed
+window.addEventListener("hashchange", updateFromHash, false);
+
+// Play/Pause
+document.body.addEventListener('keydown', function(e) {
+    if (String.fromCharCode(e.keyCode).toLowerCase() == 'p' && !play) {
+		clearInterval(updateID);
+		playID = window.setInterval(letsPlay, 1000);
+		play = true;
+	}else if (String.fromCharCode(e.keyCode).toLowerCase() == 'p' && play){
+		clearInterval(playID);
+		play = false;
+	}
+});
